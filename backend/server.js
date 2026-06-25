@@ -116,9 +116,8 @@ app.post("/sendGateAlert", async (req, res) => {
   }
 });
 
-app.listen(3000, '192.168.0.107',() => {
-  console.log(
-    "SERVER RUNNING ON PORT 3000",
-  );
-});
+const PORT = process.env.PORT || 3000;
 
+app.listen(PORT, () => {
+  console.log(`SERVER RUNNING ON PORT ${PORT}`);
+});
