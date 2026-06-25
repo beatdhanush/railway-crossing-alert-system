@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "684747614293",
+    "project_id": "railway-crossing-alert-system",
+    "storage_bucket": "railway-crossing-alert-system.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:684747614293:android:46190b1a87886b47faccdc",
+        "android_client_info": {
+          "package_name": "com.example.railway_crossing_alert_system"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDTkJ5H_yfoX49sLsIRhzNxHCzEerh7l-k"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
