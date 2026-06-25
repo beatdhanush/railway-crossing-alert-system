@@ -13,8 +13,9 @@ const {
   getMessaging,
 } = require("firebase-admin/messaging");
 
-const serviceAccount =
-  require("./serviceAccountKey.json");
+const serviceAccount = JSON.parse(
+  process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON
+);
 
 initializeApp({
   credential: cert(serviceAccount),
