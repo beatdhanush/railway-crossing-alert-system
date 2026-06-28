@@ -1,17 +1,8 @@
 const express = require("express");
 
-const {
-  initializeApp,
-  cert,
-} = require("firebase-admin/app");
-
-const {
-  getFirestore,
-} = require("firebase-admin/firestore");
-
-const {
-  getMessaging,
-} = require("firebase-admin/messaging");
+const { initializeApp, cert } = require("firebase-admin/app");
+const { getFirestore } = require("firebase-admin/firestore");
+const { getMessaging } = require("firebase-admin/messaging");
 
 const serviceAccount = JSON.parse(
   process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON
@@ -29,35 +20,26 @@ app.use(express.json());
 
 app.post("/sendGateAlert", async (req, res) => {
   try {
-    const {
-      gateId,
-      status,
-      track,
-    } = req.body;
+    const { gateId, status, track } = req.body;
 
-    console.log("================================");
+    console.log("====================================");
     console.log("NEW GATE ALERT");
     console.log("Gate :", gateId);
     console.log("Status :", status);
     console.log("Track :", track);
-    console.log("================================");
+    console.log("====================================");
 
-    const snapshot =
-        await db.collection("employees").get();
+    const snapshot = await db.collection("employees").get();
 
     const tokens = [];
 
     snapshot.forEach((doc) => {
-
       const data = doc.data();
 
-      console.log(
-        "Employee :",
-        data.employeeId,
-      );
+      console.log("Employee :", data.employeeId);
+      console.log("Tracks :", data.selectedTracks);
 
-      const tracks =
-          data.selectedTracks || [];
+      const tracks = data.selectedTracks || [];
 
       if (
         tracks
@@ -65,109 +47,95 @@ app.post("/sendGateAlert", async (req, res) => {
           .includes(track.toLowerCase()) &&
         data.fcmToken
       ) {
-        console.log(
-          "MATCH FOUND ->",
-          data.employeeId,
-        );
+        console.log("MATCH FOUND :", data.employeeId);
 
         tokens.push(data.fcmToken);
       }
     });
 
-    console.log(
-      "TOTAL TOKENS :",
-      tokens.length,
-    );
+    console.log("TOKENS :", tokens.length);
 
     if (tokens.length === 0) {
-      return res.json({
+      return res.status(200).json({
         success: false,
-        message: "No Tokens Found",
+        message: "No employee tokens found",
       });
     }
 
-    const response =
-        await getMessaging().sendEachForMulticast({
-
+    const message = {
       tokens,
 
       notification: {
-        title: `🚨 Gate ${gateId}`,
+        title: `🚨 Gate Alert - ${gateId}`,
         body: `Gate is now ${status}`,
       },
 
       android: {
-
         priority: "high",
 
         notification: {
-
           channelId: "railway_alerts",
-
-          priority: "max",
-
-          visibility: "public",
-
           sound: "default",
-
           defaultSound: true,
-
           defaultVibrateTimings: true,
-
-          notificationCount: 1,
-
-          sticky: false,
-
-          localOnly: false,
-
-          defaultLightSettings: true,
-
-          eventTimestamp: Date.now(),
-
-          tag: `${gateId}`,
-
         },
       },
 
       data: {
-
-        gateId,
-
-        status,
-
-        track,
-
-        click_action:
-            "FLUTTER_NOTIFICATION_CLICK",
-
+        gateId: gateId,
+        status: status,
+        track: track,
+        click_action: "FLUTTER_NOTIFICATION_CLICK",
       },
-    });
+    };
 
-    console.log("========================");
-    console.log(response);
-    console.log("========================");
+    const response =
+      await getMessaging().sendEachForMulticast(
+        message
+      );
 
-    res.json({
+    console.log("==============================");
+    console.log("SUCCESS :", response.successCount);
+    console.log("FAILED  :", response.failureCount);
+    console.log("==============================");
+
+    if (response.failureCount > 0) {
+      response.responses.forEach((resp, index) => {
+        if (!resp.success) {
+          console.log(
+            "FAILED TOKEN:",
+            tokens[index]
+          );
+          console.log(resp.error);
+        }
+      });
+    }
+
+    return res.status(200).json({
       success: true,
-      sent: response.successCount,
+      successCount: response.successCount,
+      failureCount: response.failureCount,
     });
 
   } catch (e) {
 
-    console.log(e);
+    console.error(e);
 
-    res.status(500).json({
+    return res.status(500).json({
+      success: false,
       error: e.message,
     });
-
   }
 });
 
-const PORT =
-    process.env.PORT || 3000;
+app.get("/", (req, res) => {
+  res.send("Railway Crossing Alert API Running");
+});
 
 const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, () => {
-  console.log(`SERVER RUNNING ON PORT ${PORT}`);
+  console.log(
+    `SERVER RUNNING ON PORT ${PORT}`
+  );
 });
