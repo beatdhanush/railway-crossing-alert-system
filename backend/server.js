@@ -35,86 +35,136 @@ app.post("/sendGateAlert", async (req, res) => {
       track,
     } = req.body;
 
-    console.log(
-      "Gate Alert Request Received",
-    );
+    console.log("================================");
+    console.log("NEW GATE ALERT");
+    console.log("Gate :", gateId);
+    console.log("Status :", status);
+    console.log("Track :", track);
+    console.log("================================");
 
-    const employeesSnapshot =
-      await db
-        .collection("employees")
-        .get();
+    const snapshot =
+        await db.collection("employees").get();
 
     const tokens = [];
 
-    employeesSnapshot.forEach((doc) => {
+    snapshot.forEach((doc) => {
 
-  const data = doc.data();
+      const data = doc.data();
 
-  console.log("EMPLOYEE:", data.employeeId);
-  console.log("TRACKS:", data.selectedTracks);
-  console.log("TOKEN:", data.fcmToken);
-  console.log("REQUEST TRACK:", track);
+      console.log(
+        "Employee :",
+        data.employeeId,
+      );
 
-  const selectedTracks =
-      data.selectedTracks || [];
+      const tracks =
+          data.selectedTracks || [];
 
-  if (
-  selectedTracks
-      .map(t => t.toLowerCase())
-      .includes(track.toLowerCase()) &&
-  data.fcmToken
-) {
+      if (
+        tracks
+          .map((t) => t.toLowerCase())
+          .includes(track.toLowerCase()) &&
+        data.fcmToken
+      ) {
+        console.log(
+          "MATCH FOUND ->",
+          data.employeeId,
+        );
 
-  console.log("MATCH FOUND");
-
-  tokens.push(data.fcmToken);
-}
-});
+        tokens.push(data.fcmToken);
+      }
+    });
 
     console.log(
-      "Tokens Found:",
+      "TOTAL TOKENS :",
       tokens.length,
     );
 
     if (tokens.length === 0) {
       return res.json({
         success: false,
-        message:
-          "No employee tokens found",
+        message: "No Tokens Found",
       });
     }
 
     const response =
-      await getMessaging()
-        .sendEachForMulticast({
-          tokens: tokens,
+        await getMessaging().sendEachForMulticast({
 
-          notification: {
-            title:
-              `Gate Alert - ${gateId}`,
+      tokens,
 
-            body:
-              `Gate is now ${status}`,
-          },
-        });
+      notification: {
+        title: `🚨 Gate ${gateId}`,
+        body: `Gate is now ${status}`,
+      },
 
+      android: {
+
+        priority: "high",
+
+        notification: {
+
+          channelId: "railway_alerts",
+
+          priority: "max",
+
+          visibility: "public",
+
+          sound: "default",
+
+          defaultSound: true,
+
+          defaultVibrateTimings: true,
+
+          notificationCount: 1,
+
+          sticky: false,
+
+          localOnly: false,
+
+          defaultLightSettings: true,
+
+          eventTimestamp: Date.now(),
+
+          tag: `${gateId}`,
+
+        },
+      },
+
+      data: {
+
+        gateId,
+
+        status,
+
+        track,
+
+        click_action:
+            "FLUTTER_NOTIFICATION_CLICK",
+
+      },
+    });
+
+    console.log("========================");
     console.log(response);
+    console.log("========================");
 
     res.json({
       success: true,
-      sent:
-        response.successCount,
+      sent: response.successCount,
     });
 
-  } catch (error) {
+  } catch (e) {
 
-    console.error(error);
+    console.log(e);
 
     res.status(500).json({
-      error: error.message,
+      error: e.message,
     });
+
   }
 });
+
+const PORT =
+    process.env.PORT || 3000;
 
 const PORT = process.env.PORT || 3000;
 

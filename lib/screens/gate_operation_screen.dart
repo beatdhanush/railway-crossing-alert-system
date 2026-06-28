@@ -67,7 +67,7 @@ Future<void> sendNotification() async {
         await http.post(
 
       Uri.parse(
-        'http://192.168.0.107:3000/sendGateAlert',
+         'https://railway-crossing-alert-system.onrender.com/sendGateAlert',
       ),
 
       headers: {

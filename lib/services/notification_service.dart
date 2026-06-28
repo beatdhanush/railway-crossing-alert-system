@@ -1,5 +1,9 @@
+import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
+
+import '../firebase_options.dart';
+import 'local_notification_service.dart';
 
 class NotificationService {
   static final FirebaseMessaging messaging =
@@ -8,6 +12,11 @@ class NotificationService {
   static Future<void> initialize() async {
     try {
       print("========== NOTIFICATION INIT ==========");
+
+      // Initialize Local Notification Plugin
+      if (!kIsWeb) {
+        await LocalNotificationService.initialize();
+      }
 
       NotificationSettings settings =
           await messaging.requestPermission(
@@ -36,22 +45,38 @@ class NotificationService {
       }
 
       FirebaseMessaging.onMessage.listen(
-        (RemoteMessage message) {
+        (RemoteMessage message) async {
           print("");
           print("========== PUSH RECEIVED ==========");
-          print("TITLE : ${message.notification?.title}");
-          print("BODY  : ${message.notification?.body}");
+          print(
+            "TITLE : ${message.notification?.title}",
+          );
+          print(
+            "BODY  : ${message.notification?.body}",
+          );
           print("DATA  : ${message.data}");
           print("==================================");
+
+          // Show Android Popup Notification
+          if (!kIsWeb &&
+              message.notification != null) {
+            await LocalNotificationService
+                .showNotification(
+              title:
+                  message.notification!.title ??
+                      "Railway Alert",
+
+              body:
+                  message.notification!.body ??
+                      "",
+            );
+          }
         },
       );
 
       FirebaseMessaging.onMessageOpenedApp.listen(
         (RemoteMessage message) {
-          print(
-            "Notification Opened",
-          );
-
+          print("Notification Opened");
           print(message.data);
         },
       );
@@ -60,8 +85,9 @@ class NotificationService {
         _firebaseMessagingBackgroundHandler,
       );
 
-      print("==================================");
-
+      print(
+        "==================================",
+      );
     } catch (e) {
       print(
         "NOTIFICATION ERROR => $e",
@@ -74,8 +100,27 @@ class NotificationService {
 Future<void> _firebaseMessagingBackgroundHandler(
     RemoteMessage message) async {
 
+  await Firebase.initializeApp(
+    options:
+        DefaultFirebaseOptions.currentPlatform,
+  );
+
   print("========== BACKGROUND ==========");
   print(message.notification?.title);
   print(message.notification?.body);
   print(message.data);
+
+  if (!kIsWeb &&
+      message.notification != null) {
+    await LocalNotificationService
+        .showNotification(
+      title:
+          message.notification!.title ??
+              "Railway Alert",
+
+      body:
+          message.notification!.body ??
+              "",
+    );
+  }
 }
