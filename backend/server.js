@@ -1,4 +1,5 @@
 const express = require("express");
+const cors = require("cors");
 
 const { initializeApp, cert } = require("firebase-admin/app");
 const { getFirestore } = require("firebase-admin/firestore");
@@ -15,6 +16,8 @@ initializeApp({
 const db = getFirestore();
 
 const app = express();
+
+app.use(cors());
 
 app.use(express.json());
 
