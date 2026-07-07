@@ -2,7 +2,10 @@ const express = require("express");
 const cors = require("cors");
 
 const { initializeApp, cert } = require("firebase-admin/app");
-const { getFirestore } = require("firebase-admin/firestore");
+const {
+  getFirestore,
+  FieldValue,
+} = require("firebase-admin/firestore");
 const { getMessaging } = require("firebase-admin/messaging");
 
 const serviceAccount = JSON.parse(
@@ -32,33 +35,61 @@ app.post("/sendGateAlert", async (req, res) => {
     console.log("Track :", track);
     console.log("====================================");
 
-    const snapshot = await db.collection("employees").get();
+    // ======================================
+// COLLECT TOKENS FROM ALL USERS
+// ======================================
 
-    const tokens = [];
+const tokens = [];
 
-    snapshot.forEach((doc) => {
-      const data = doc.data();
+async function collectTokens(collectionName) {
 
-      console.log("Employee :", data.employeeId);
-      console.log("Tracks :", data.selectedTracks);
+  const snapshot =
+      await db.collection(collectionName).get();
 
-      const tracks = data.selectedTracks || [];
+  let count = 0;
 
-      if (
-        tracks
-          .map((t) => t.toLowerCase())
-          .includes(track.toLowerCase()) &&
-        data.fcmToken
-      ) {
-        console.log("MATCH FOUND :", data.employeeId);
+  snapshot.forEach((doc) => {
 
-        tokens.push(data.fcmToken);
-      }
-    });
+    const data = doc.data();
 
-    console.log("TOKENS :", tokens.length);
+    if (
+      data.fcmToken &&
+      data.fcmToken.trim() !== ""
+    ) {
 
-    if (tokens.length === 0) {
+      tokens.push(data.fcmToken);
+      count++;
+
+      console.log(
+        `${collectionName} -> ${doc.id}`
+      );
+
+    }
+
+  });
+
+  console.log(
+    `${collectionName} tokens = ${count}`
+  );
+
+}
+
+await collectTokens("admins");
+
+await collectTokens("operators");
+
+await collectTokens("employees");
+
+// Remove duplicate tokens
+
+const uniqueTokens = [...new Set(tokens)];
+
+console.log(
+  "TOTAL TOKENS :",
+  uniqueTokens.length,
+);
+
+    if (uniqueTokens.length === 0) {
       return res.status(200).json({
         success: false,
         message: "No employee tokens found",
@@ -66,12 +97,12 @@ app.post("/sendGateAlert", async (req, res) => {
     }
 
     const message = {
-      tokens,
+      tokens: uniqueTokens,
 
       notification: {
-        title: `🚨 Gate Alert - ${gateId}`,
-        body: `Gate is now ${status}`,
-      },
+  title: "Gate Alert",
+  body: `${gateId} is now ${status}`,
+},
 
       android: {
         priority: "high",
@@ -103,16 +134,50 @@ app.post("/sendGateAlert", async (req, res) => {
     console.log("==============================");
 
     if (response.failureCount > 0) {
-      response.responses.forEach((resp, index) => {
-        if (!resp.success) {
+
+  for (let i = 0; i < response.responses.length; i++) {
+
+    const resp = response.responses[i];
+
+    if (resp.success) continue;
+
+    const failedToken = uniqueTokens[i];
+
+    console.log("FAILED TOKEN :", failedToken);
+    console.log(resp.error);
+
+    const collections = [
+      "admins",
+      "operators",
+      "employees",
+    ];
+
+    for (const collection of collections) {
+
+      const snapshot =
+          await db.collection(collection).get();
+
+      for (const doc of snapshot.docs) {
+
+        if (doc.data().fcmToken === failedToken) {
+
           console.log(
-            "FAILED TOKEN:",
-            tokens[index]
+            `REMOVING INVALID TOKEN FROM ${collection}/${doc.id}`
           );
-          console.log(resp.error);
+
+          await doc.ref.update({
+            fcmToken: FieldValue.delete(),
+          });
+
         }
-      });
+
+      }
+
     }
+
+  }
+
+}
 
     return res.status(200).json({
       success: true,
