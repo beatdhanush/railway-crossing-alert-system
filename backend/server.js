@@ -72,7 +72,7 @@ app.post("/sendGateAlert", async (req, res) => {
       });
     }
 
-    const gateFormatted = gateId.toUpperCase().replace("GATE", "GATE ");
+    const gateFormatted = gateId ? gateId.toUpperCase().replace("GATE", "GATE ") : "GATE";
     let notifTitle = "";
     let notifBody = "";
 
@@ -85,7 +85,7 @@ app.post("/sendGateAlert", async (req, res) => {
       }
     } else {
       notifTitle = `${gateFormatted} is now OPEN`;
-      notifBody = " ";
+      notifBody = `${gateFormatted} is now OPEN`;
     }
 
     const message = {
@@ -107,9 +107,11 @@ app.post("/sendGateAlert", async (req, res) => {
       },
 
       data: {
-        gateId: gateId,
-        status: status,
-        track: track,
+        gateId: String(gateId || ""),
+        status: String(status || ""),
+        track: String(track || ""),
+        title: String(notifTitle),
+        body: String(notifBody),
         click_action: "FLUTTER_NOTIFICATION_CLICK",
       },
     };
@@ -125,50 +127,37 @@ app.post("/sendGateAlert", async (req, res) => {
     console.log("==============================");
 
     if (response.failureCount > 0) {
+      for (let i = 0; i < response.responses.length; i++) {
+        const resp = response.responses[i];
+        if (resp.success) continue;
 
-  for (let i = 0; i < response.responses.length; i++) {
+        const failedToken = uniqueTokens[i];
+        console.log("FAILED TOKEN :", failedToken);
+        console.log(resp.error);
 
-    const resp = response.responses[i];
+        const collections = [
+          "admins",
+          "operators",
+          "employees",
+        ];
 
-    if (resp.success) continue;
+        for (const collection of collections) {
+          const snapshot = await db
+            .collection(collection)
+            .where("fcmToken", "==", failedToken)
+            .get();
 
-    const failedToken = uniqueTokens[i];
-
-    console.log("FAILED TOKEN :", failedToken);
-    console.log(resp.error);
-
-    const collections = [
-      "admins",
-      "operators",
-      "employees",
-    ];
-
-    for (const collection of collections) {
-
-      const snapshot =
-          await db.collection(collection).get();
-
-      for (const doc of snapshot.docs) {
-
-        if (doc.data().fcmToken === failedToken) {
-
-          console.log(
-            `REMOVING INVALID TOKEN FROM ${collection}/${doc.id}`
-          );
-
-          await doc.ref.update({
-            fcmToken: FieldValue.delete(),
-          });
-
+          for (const doc of snapshot.docs) {
+            console.log(
+              `REMOVING INVALID TOKEN FROM ${collection}/${doc.id}`
+            );
+            await doc.ref.update({
+              fcmToken: FieldValue.delete(),
+            });
+          }
         }
-
       }
-
     }
-
-  }
-
-}
 
     return res.status(200).json({
       success: true,
