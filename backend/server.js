@@ -26,68 +26,44 @@ app.use(express.json());
 
 app.post("/sendGateAlert", async (req, res) => {
   try {
-    const { gateId, status, track } = req.body;
+    const { gateId, status, track, expectedTime } = req.body;
 
     console.log("====================================");
     console.log("NEW GATE ALERT");
     console.log("Gate :", gateId);
     console.log("Status :", status);
     console.log("Track :", track);
+    console.log("Expected :", expectedTime);
     console.log("====================================");
 
     // ======================================
-// COLLECT TOKENS FROM ALL USERS
-// ======================================
+    // COLLECT TOKENS FROM ALL USERS
+    // ======================================
 
-const tokens = [];
+    const tokens = [];
 
-async function collectTokens(collectionName) {
-
-  const snapshot =
-      await db.collection(collectionName).get();
-
-  let count = 0;
-
-  snapshot.forEach((doc) => {
-
-    const data = doc.data();
-
-    if (
-      data.fcmToken &&
-      data.fcmToken.trim() !== ""
-    ) {
-
-      tokens.push(data.fcmToken);
-      count++;
-
-      console.log(
-        `${collectionName} -> ${doc.id}`
-      );
-
+    async function collectTokens(collectionName) {
+      const snapshot = await db.collection(collectionName).get();
+      let count = 0;
+      snapshot.forEach((doc) => {
+        const data = doc.data();
+        if (data.fcmToken && data.fcmToken.trim() !== "") {
+          tokens.push(data.fcmToken);
+          count++;
+          console.log(`${collectionName} -> ${doc.id}`);
+        }
+      });
+      console.log(`${collectionName} tokens = ${count}`);
     }
 
-  });
+    await collectTokens("admins");
+    await collectTokens("operators");
+    await collectTokens("employees");
 
-  console.log(
-    `${collectionName} tokens = ${count}`
-  );
+    // Remove duplicate tokens
+    const uniqueTokens = [...new Set(tokens)];
 
-}
-
-await collectTokens("admins");
-
-await collectTokens("operators");
-
-await collectTokens("employees");
-
-// Remove duplicate tokens
-
-const uniqueTokens = [...new Set(tokens)];
-
-console.log(
-  "TOTAL TOKENS :",
-  uniqueTokens.length,
-);
+    console.log("TOTAL TOKENS :", uniqueTokens.length);
 
     if (uniqueTokens.length === 0) {
       return res.status(200).json({
@@ -96,13 +72,28 @@ console.log(
       });
     }
 
+    const gateFormatted = gateId.toUpperCase().replace("GATE", "GATE ");
+    let notifTitle = "";
+    let notifBody = "";
+
+    if (status === "CLOSED" || status === "EXPECTED_TO_CLOSE") {
+      notifTitle = `${gateFormatted} is now CLOSED`;
+      if (expectedTime) {
+        notifBody = `${gateFormatted} is expected to open at ${expectedTime}.`;
+      } else {
+        notifBody = `${gateFormatted} is now CLOSED.`;
+      }
+    } else {
+      notifTitle = `${gateFormatted} is now OPEN`;
+      notifBody = " ";
+    }
+
     const message = {
       tokens: uniqueTokens,
-
       notification: {
-  title: "Gate Alert",
-  body: `${gateId} is now ${status}`,
-},
+        title: notifTitle,
+        body: notifBody,
+      },
 
       android: {
         priority: "high",
