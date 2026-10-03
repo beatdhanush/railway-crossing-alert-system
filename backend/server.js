@@ -92,22 +92,11 @@ app.post("/sendGateAlert", async (req, res) => {
 
     const message = {
       tokens: uniqueTokens,
-      notification: {
-        title: notifTitle,
-        body: notifBody,
-      },
-
+      // Removed 'notification' block to make this a DATA-ONLY message.
+      // This prevents the OS from automatically showing a duplicate notification.
       android: {
         priority: "high",
-
-        notification: {
-          channelId: "railway_alerts",
-          sound: "default",
-          defaultSound: true,
-          defaultVibrateTimings: true,
-        },
       },
-
       data: {
         gateId: String(gateId || ""),
         status: String(status || ""),
