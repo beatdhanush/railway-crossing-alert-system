@@ -84,8 +84,10 @@ app.post("/sendGateAlert", async (req, res) => {
         notifBody = `${gateFormatted} is now CLOSED.`;
       }
     } else {
+      const now = new Date();
+      const timeString = now.toLocaleTimeString('en-US', { timeZone: 'Asia/Kolkata', hour: 'numeric', minute: '2-digit', hour12: true });
       notifTitle = `${gateFormatted} is now OPEN`;
-      notifBody = `${gateFormatted} is now OPEN`;
+      notifBody = `${gateFormatted} OPENED at ${timeString}.`;
     }
 
     const message = {
